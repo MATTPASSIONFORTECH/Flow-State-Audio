@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { pdfChapters } from '../data/pdfShortcuts';
 
 interface KeyDef {
@@ -24,8 +24,10 @@ interface Entry {
   combo: string;
 }
 
-const U = 42; // key unit in px
+const U = 60; // key unit in px
 const GAP = 5;
+// natural footprint of the keyboard: widest row (15 units) + block gap + keypad
+const NATURAL_W = 19 * U + 6;
 
 // ---------------------------------------------------------------------------
 // Full-size Mac keyboard layout (US ANSI): function row, main block with
@@ -170,6 +172,23 @@ export default function KeyboardView() {
   const [selected, setSelected] = useState<string | null>(null);
   const [pressed, setPressed] = useState<Set<string>>(new Set());
 
+  // Scale the keyboard down to fit narrow viewports instead of scrolling.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => {
+      const avail = el.clientWidth - 32; // p-4 padding
+      if (avail > 0) setScale(Math.min(1, avail / NATURAL_W));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const { focus, byKey, byMod } = useMemo(() => {
     const focus = new Map<string, string>();
     const byKey = new Map<string, Entry[]>();
@@ -289,20 +308,22 @@ export default function KeyboardView() {
         key={keyIdx}
         onClick={() => setSelected(isSelected ? null : k.id)}
         title={focusLabel ? `${k.label} — ${focusLabel} (${count} shortcuts)` : count > 0 ? `${k.label} — ${count} shortcuts` : k.label}
-        className={`relative shrink-0 rounded-[5px] border transition-colors overflow-hidden group ${keyClass(!!focusLabel, count, isSelected, isPressed)}`}
+        className={`relative shrink-0 rounded-[6px] border transition-colors overflow-hidden group flex flex-col gap-0.5 p-1 text-left ${keyClass(!!focusLabel, count, isSelected, isPressed)}`}
         style={{ width: (k.w ?? 1) * U - GAP, height: U - GAP }}
       >
-        <span className={`absolute top-0.5 left-1.5 ${k.small ? 'text-[8px]' : 'text-[9px]'} font-semibold text-gray-400 group-hover:text-gray-200`}>
-          {k.label}
+        <span className="flex items-start justify-between gap-1 w-full min-w-0">
+          <span className={`truncate ${k.small ? 'text-[9px]' : 'text-[10px]'} leading-tight font-semibold text-gray-400 group-hover:text-gray-200`}>
+            {k.label}
+          </span>
+          {count > 0 && (
+            <span className={`shrink-0 leading-none text-[8px] font-mono px-1 py-0.5 rounded ${focusLabel ? 'bg-blue-400/20 text-blue-200' : 'bg-emerald-400/15 text-emerald-300'}`}>
+              {count}
+            </span>
+          )}
         </span>
         {focusLabel && (
-          <span className="absolute left-0.5 right-0.5 top-3.5 bottom-0 text-[6.5px] leading-[1.1] font-medium text-blue-200/90 overflow-hidden text-left px-1">
+          <span className="line-clamp-3 text-[9px] leading-[1.15] font-medium text-blue-200/85 overflow-hidden">
             {focusLabel}
-          </span>
-        )}
-        {count > 0 && (
-          <span className={`absolute bottom-0.5 right-1 text-[7px] font-mono ${focusLabel ? 'text-blue-300/80' : 'text-emerald-400/90'}`}>
-            {count}
           </span>
         )}
       </button>
@@ -320,20 +341,22 @@ export default function KeyboardView() {
         key={keyIdx}
         onClick={() => setSelected(isSelected ? null : k.id)}
         title={count > 0 ? `${k.label} — ${count} shortcuts` : k.label}
-        className={`relative rounded-[5px] border transition-colors overflow-hidden group h-full w-full ${keyClass(!!focusLabel, count, isSelected, isPressed)}`}
+        className={`relative rounded-[6px] border transition-colors overflow-hidden group h-full w-full flex flex-col gap-0.5 p-1 text-left ${keyClass(!!focusLabel, count, isSelected, isPressed)}`}
         style={{ gridColumn: `${k.c + 1} / span ${k.cs ?? 1}`, gridRow: `${k.r + 1} / span ${k.rs ?? 1}` }}
       >
-        <span className={`absolute top-0.5 left-1.5 ${k.small ? 'text-[8px]' : 'text-[10px]'} font-semibold text-gray-400 group-hover:text-gray-200`}>
-          {k.label}
+        <span className="flex items-start justify-between gap-1 w-full min-w-0">
+          <span className={`truncate ${k.small ? 'text-[9px]' : 'text-[10px]'} leading-tight font-semibold text-gray-400 group-hover:text-gray-200`}>
+            {k.label}
+          </span>
+          {count > 0 && (
+            <span className={`shrink-0 leading-none text-[8px] font-mono px-1 py-0.5 rounded ${focusLabel ? 'bg-blue-400/20 text-blue-200' : 'bg-emerald-400/15 text-emerald-300'}`}>
+              {count}
+            </span>
+          )}
         </span>
         {focusLabel && (
-          <span className="absolute left-0.5 right-0.5 top-3.5 bottom-0 text-[6.5px] leading-[1.1] font-medium text-blue-200/90 overflow-hidden text-left px-1">
+          <span className="line-clamp-3 text-[9px] leading-[1.15] font-medium text-blue-200/85 overflow-hidden">
             {focusLabel}
-          </span>
-        )}
-        {count > 0 && (
-          <span className={`absolute bottom-0.5 right-1 text-[7px] font-mono ${focusLabel ? 'text-blue-300/80' : 'text-emerald-400/90'}`}>
-            {count}
           </span>
         )}
       </button>
@@ -360,8 +383,8 @@ export default function KeyboardView() {
       </div>
 
       {/* Keyboard */}
-      <div className="bg-gray-900/70 border border-gray-700/60 rounded-2xl p-4 overflow-x-auto">
-        <div className="inline-flex items-start gap-4">
+      <div ref={wrapRef} className="bg-gray-900/70 border border-gray-700/60 rounded-2xl p-4 overflow-x-auto">
+        <div className="inline-flex items-start gap-4" style={{ zoom: scale }}>
           {/* Main block + function row */}
           <div className="inline-flex flex-col" style={{ gap: GAP }}>
             {MAIN_ROWS.map((row, ri) => (
